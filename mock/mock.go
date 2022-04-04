@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -49,13 +50,28 @@ func main() {
 		fmt.Println("---------------- begin ------------------------")
 		log.Printf("request received:\n%s", string(data))
 		fmt.Println("---------------- end --------------------------")
+	})
 
-		w.Write([]byte(`{"isSuccess": true}`)) // nolint: errcheck
+	var hash = sha256.New()
+	mux.HandleFunc("/CreateMultipartUpload", func(w http.ResponseWriter, r *http.Request) {
+		hash = sha256.New()
+		w.Write([]byte(`{"Exist": false, "UploadId": "d2e6953a-dc83-47b1-9aba-00ee1862e2fb"}`)) // nolint: errcheck
+	})
+
+	mux.HandleFunc("/CompleteMultipartUpload", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Printf("%x\n", hash.Sum(nil))
+		w.Write([]byte(`{}`)) // nolint: errcheck
+	})
+
+	mux.HandleFunc("/UploadPart", func(w http.ResponseWriter, r *http.Request) {
+		data, _ := ioutil.ReadAll(r.Body) // nolint: errcheck
+		hash.Write(data)                  // nolint: errcheck
+		w.Write([]byte(`{}`))             // nolint: errcheck
 	})
 
 	var handler = cors.New(cors.Options{
 		AllowedOrigins: []string{"*"},
-		Debug:          true,
+		AllowedHeaders: []string{"*"},
 	}).Handler(mux)
 
 	var addr = fmt.Sprintf(":%d", 8080)
