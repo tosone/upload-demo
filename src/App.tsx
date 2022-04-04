@@ -24,13 +24,13 @@ function App() {
       setShowProgress(true);
       handler(counter);
     }
-  }, [fileToBeUpload, counter]);
+  }, [fileToBeUpload, counter, fileSize]);
 
   useEffect(() => {
     if (chunks.length !== 0 && chunks.length === chunkCount) {
       completeMultipartUpload();
     }
-  }, [chunks]);
+  }, [chunks, chunkCount]);
 
   const handler = (counter: number) => {
     if (counter <= chunkCount) {
@@ -39,25 +39,18 @@ function App() {
     }
   }
 
-  const uploadHandler = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const uploadHandler = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    let reader = new FileReader();
-    reader.readAsArrayBuffer(file);
-    reader.onload = async (e) => {
-      let buffer = (e.target as FileReader).result as ArrayBuffer;
-      const byteArray = new Uint8Array(buffer);
-      const hash = CryptoJS.SHA256(byteArray2WordArray(byteArray)).toString();
-      let uploaded = await createMultipartUpload(hash, file.name);
-      if (!uploaded.Exist) {
-        setFilename(file.name);
-        setUploadId(uploaded.UploadId);
-        setCounter(1);
-        setChunks([]);
-        setChunkCount(file.size % chunkSize === 0 ? file.size / chunkSize : Math.floor(file.size / chunkSize) + 1);
-        setFileSize(file.size);
-        setFileToBeUpload(file);
-      }
+    let uploaded = await createMultipartUpload(file.name);
+    if (!uploaded.Exist) {
+      setFilename(file.name);
+      setUploadId(uploaded.UploadId);
+      setCounter(1);
+      setChunks([]);
+      setChunkCount(file.size % chunkSize === 0 ? file.size / chunkSize : Math.floor(file.size / chunkSize) + 1);
+      setFileSize(file.size);
+      setFileToBeUpload(file);
     }
   }
 
@@ -74,6 +67,7 @@ function App() {
     const hash = CryptoJS.SHA256(byteArray2WordArray(byteArray)).toString();
     const response = await axios.post("http://localhost:8080/UploadPart", chunk, {
       params: {
+        UploadId: uploadId,
         Id: counter,
         Filename: filename,
       },
@@ -91,14 +85,13 @@ function App() {
     }
   }
 
-  const createMultipartUpload = async (hash: string, filename: string) => {
+  const createMultipartUpload = async (filename: string) => {
     const response = await axios.get("http://localhost:8080/CreateMultipartUpload", {
       params: {
         Filename: filename,
       },
       headers: {
         'Content-Type': 'application/json',
-        "Content-Sha256": hash,
       }
     });
     if (response.status === 200) {
@@ -110,16 +103,19 @@ function App() {
   }
 
   const completeMultipartUpload = async () => {
-    const response = await axios.post("http://localhost:8080/CompleteMultipartUpload", {
-      Chunks: chunks,
-    }, {
-      params: {
-        Filename: filename,
+    const response = await axios.post("http://localhost:8080/CompleteMultipartUpload",
+      {
+        UploadId: uploadId,
+        Chunks: chunks,
       },
-      headers: {
-        'Content-Type': 'application/json',
-      }
-    })
+      {
+        params: {
+          Filename: filename,
+        },
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      })
     if (response.status === 200) {
       console.log("upload complete");
     }
