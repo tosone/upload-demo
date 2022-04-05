@@ -56,7 +56,12 @@ function App() {
     }
   }
 
-  // chrome cannot load big than 261MB file, so we use stream to read file
+  // All of bugs about component:Blink>Storage>FileAPI: https://bugs.chromium.org/p/chromium/issues/list?q=component:Blink%3EStorage%3EFileAPI
+
+  // more context: https://bugs.chromium.org/p/chromium/issues/detail?id=683422&q=FileReader%20limit&can=2
+  // https://bugs.chromium.org/p/chromium/issues/detail?id=1289653&q=component%3ABlink%3EStorage%3EFileAPI
+  // https://chromium.googlesource.com/chromium/src/+/HEAD/storage/browser/blob/README.md
+  // chrome cannot load big than 261MB(or something else, seems like 200MB) file, so we use stream to read file
   const caculateBigFile = async (blob: Blob) => {
     const chunkCount = blob.size % bigChunkSize === 0 ? blob.size / bigChunkSize : Math.floor(blob.size / bigChunkSize) + 1;
     const h = CryptoJS.algo.SHA256.create();
