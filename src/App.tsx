@@ -5,7 +5,8 @@ import { ProgressBar, Card, Form, Container } from 'react-bootstrap';
 
 import './App.css';
 
-const chunkSize = 1024 * 1024 * 6; // 6MB
+const chunkSize = 1024 * 1024 * 10; // 10MB
+const bigChunkSize = 1024 * 1024 * 100; // 100MB
 
 function App() {
   const [showProgress, setShowProgress] = useState(false)
@@ -42,7 +43,8 @@ function App() {
   const uploadHandler = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    let uploaded = await createMultipartUpload(file.name);
+    const hash = await caculateBigFile(file);
+    let uploaded = await createMultipartUpload(file.name, hash);
     if (!uploaded.Exist) {
       setFilename(file.name);
       setUploadId(uploaded.UploadId);
@@ -52,6 +54,23 @@ function App() {
       setFileSize(file.size);
       setFileToBeUpload(file);
     }
+  }
+
+  // chrome cannot load big than 261MB file, so we use stream to read file
+  const caculateBigFile = async (blob: Blob) => {
+    const chunkCount = blob.size % bigChunkSize === 0 ? blob.size / bigChunkSize : Math.floor(blob.size / bigChunkSize) + 1;
+    const h = CryptoJS.algo.SHA256.create();
+    for (let i = 0; i < chunkCount; i++) {
+      let label = "part " + (i + 1) + " hash"
+      console.time(label);
+      const chunk = blob.slice(bigChunkSize * i, bigChunkSize * (i + 1));
+      const byteArray = new Uint8Array(await chunk.arrayBuffer());
+      const wrodArray = byteArray2WordArray(byteArray);
+      h.update(wrodArray);
+      console.timeEnd(label);
+    }
+    const hash = h.finalize().toString();
+    return hash;
   }
 
   const byteArray2WordArray = (byteArray: Uint8Array) => {
@@ -77,7 +96,7 @@ function App() {
       }
     });
     if (response.status === 200) {
-      console.log("upload chunk success");
+      console.log("part " + counter + " upload chunk success");
       setChunks([...chunks, hash]);
       if (counter < chunkCount) {
         setCounter(counter + 1);
@@ -85,13 +104,14 @@ function App() {
     }
   }
 
-  const createMultipartUpload = async (filename: string) => {
+  const createMultipartUpload = async (filename: string, hash: string) => {
     const response = await axios.get("http://localhost:8080/CreateMultipartUpload", {
       params: {
         Filename: filename,
       },
       headers: {
         'Content-Type': 'application/json',
+        "Content-Sha256": hash,
       }
     });
     if (response.status === 200) {
