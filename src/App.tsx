@@ -86,6 +86,9 @@ function App() {
     return CryptoJS.lib.WordArray.create(wordArray, byteArray.length);
   }
 
+  // TODO: async and retry upload
+  // npm install p-forever
+  // npm install p-map
   const uploadPart = async (chunk: Blob) => {
     const byteArray = new Uint8Array(await chunk.arrayBuffer());
     const hash = CryptoJS.SHA256(byteArray2WordArray(byteArray)).toString();
